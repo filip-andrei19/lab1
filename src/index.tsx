@@ -2,6 +2,7 @@
 import { Hono } from "hono";
 import { logger } from "hono/logger";
 import { stringPages } from "./string-pages";
+import { etaPages } from "./eta-pages";
 
 const app = new Hono();
 app.use(logger()); // one line: every request logged with status and time
@@ -68,5 +69,7 @@ app.all('/status/:code', (c) => {
 app.notFound((c) => c.json({ error: "Not found", path: c.req.path }, 404));
 
 app.route("/strings", stringPages);
+
+app.route("/eta", etaPages);
 
 export default app; // Bun sees a default export with fetch() and serves it
