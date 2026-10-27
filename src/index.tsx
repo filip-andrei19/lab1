@@ -1,97 +1,54 @@
-// src/index.tsx — the same server with a framework
+// src/index.tsx — the office site
+import { serveStatic } from "@hono/bun";
 import { Hono } from "hono";
 import { logger } from "hono/logger";
-import { stringPages } from "./string-pages";
-import { etaPages } from "./eta-pages";
-import { team } from "./data";
-import { Layout } from "./views/Layout";
-import { serveStatic } from "@hono/bun";
 import { readdir } from "node:fs/promises";
+import { team } from "./data";
+import { etaPages } from "./eta-pages";
+import { stringPages } from "./string-pages";
+import { Layout } from "./views/Layout";
 
-const app = new Hono();
-app.use(logger()); // one line: every request logged with status and time
+type Env = { Variables: { requestId: string } };
+const app = new Hono<Env>();
 
-// --- RUTA / ---
-app.get("/", (c) => {
-  c.header("X-Course", "advanced-web");
-  return c.text("Hello from Hono!\n");
+app.use(logger());
+
+// step 8: a middleware of our own
+app.use(async (c, next) => {
+  const started = performance.now();
+  c.set("requestId", crypto.randomUUID().slice(0, 8));
+  await next();
+  const ms = (performance.now() - started).toFixed(1);
+  c.header("X-Request-Id", c.get("requestId"));
+  c.header("X-Response-Time", `${ms}ms`);
 });
-// 405 pentru restul metodelor pe /
-app.all("/", (c) => {
-  c.header("Allow", "GET");
-  return c.text("Method Not Allowed", 405);
-});
+app.use("*", serveStatic({ root: "./public" }));
 
-// --- RUTA /echo ---
 app.get("/echo", (c) => c.json({ hello: c.req.query("name") ?? "stranger" }));
 app.post("/echo", async (c) => {
   const body = await c.req.text();
   return c.json({ youSent: body, contentType: c.req.header("content-type") });
 });
-// 405 pentru restul metodelor pe /echo
-app.all("/echo", (c) => {
-  c.header("Allow", "GET, POST");
-  return c.text("Method Not Allowed", 405);
-});
-
-// --- RUTA /headers ---
-app.get('/headers', (c) => {
-  return c.json(c.req.header());
-});
-// 405 pentru restul metodelor pe /headers
-app.all('/headers', (c) => {
-  c.header("Allow", "GET");
-  return c.text("Method Not Allowed", 405);
-});
-
-// --- RUTA /time ---
 app.get("/time", (c) => {
   c.header("Cache-Control", "no-store");
   return c.json({ now: new Date().toISOString() });
 });
-// 405 pentru restul metodelor pe /time
-app.all('/time', (c) => {
-  c.header("Allow", "GET");
-  return c.text("Method Not Allowed", 405);
-});
 
-// --- RUTA NOUĂ /status/:code ---
-app.get('/status/:code', (c) => {
-  const code = parseInt(c.req.param("code"));
-  if (isNaN(code) || code < 200 || code > 599) {
-    return c.text("Bad Request", 400);
-  }
-  return c.json({ status: code }, code as any);
+// step 3: responses by hand
+app.get("/api/status", (c) =>
+  c.json({ ok: true, uptime: Math.round(process.uptime()), requestId: c.get("requestId") }),
+);
+app.get("/hello", (c) => c.html(`<h1>Hello, ${c.req.query("name") ?? "stranger"}!</h1>`));
+app.get("/teapot", (c) => {
+  c.header("X-Brewed-By", "Hono");
+  return c.text("I'm a teapot\n", 418);
 });
-// 405 pentru restul metodelor pe /status/:code
-app.all('/status/:code', (c) => {
-  c.header("Allow", "GET");
-  return c.text("Method Not Allowed", 405);
-});
+app.get("/home", (c) => c.redirect("/"));
 
-// step 7b: a page that lists a folder
-app.get("/files", async (c) => {
-  const names = await readdir("./public");
-  const files = names.map((name) => ({ name, size: Bun.file(`./public/${name}`).size }));
-  return c.html(
-    <Layout title="Files">
-      <h1>public/</h1>
-      <ul>
-        {files.map((file) => (
-          <li>
-            <a href={`/${file.name}`}>{file.name}</a> — {file.size} bytes
-          </li>
-        ))}
-      </ul>
-    </Layout>,
-  );
-});
-
-// --- EROAREA STANDARD 404 ---
-app.notFound((c) => c.json({ error: "Not found", path: c.req.path }, 404));
-
+// step 4: pages from strings
 app.route("/strings", stringPages);
 
+// step 5: pages from an engine
 app.route("/eta", etaPages);
 
 // step 6: pages from components
@@ -118,6 +75,50 @@ app.get("/team", (c) =>
   ),
 );
 
-app.use("*", serveStatic({ root: "./public" }));
+// step 7b: a page that lists a folder
+app.get("/files", async (c) => {
+  const names = await readdir("./public");
+  const files = names.map((name) => ({ name, size: Bun.file(`./public/${name}`).size }));
+  return c.html(
+    <Layout title="Files">
+      <h1>public/</h1>
+      <ul>
+        {files.map((file) => (
+          <li>
+            <a href={`/${file.name}`}>{file.name}</a> — {file.size} bytes
+          </li>
+        ))}
+      </ul>
+    </Layout>,
+  );
+});
 
-export default app; // Bun sees a default export with fetch() and serves it
+// step 8: our own 404 and 500 pages
+app.notFound((c) =>
+  c.html(
+    <Layout title="Not found">
+      <h1>404 — nothing here</h1>
+      <p>
+        No page at <code>{c.req.path}</code>. <a href="/">Back home</a>
+      </p>
+    </Layout>,
+    404,
+  ),
+);
+
+app.onError((err, c) => {
+  console.error(`[${c.get("requestId")}]`, err.message);
+  return c.html(
+    <Layout title="Error">
+      <h1>Something broke</h1>
+      <p>Request {c.get("requestId")} failed. It has been logged.</p>
+    </Layout>,
+    500,
+  );
+});
+
+app.get("/boom", () => {
+  throw new Error("Boom: a test error");
+});
+
+export default app;
