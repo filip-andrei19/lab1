@@ -3,6 +3,8 @@ import { Hono } from "hono";
 import { logger } from "hono/logger";
 import { stringPages } from "./string-pages";
 import { etaPages } from "./eta-pages";
+import { team } from "./data";
+import { Layout } from "./views/Layout";
 
 const app = new Hono();
 app.use(logger()); // one line: every request logged with status and time
@@ -71,5 +73,29 @@ app.notFound((c) => c.json({ error: "Not found", path: c.req.path }, 404));
 app.route("/strings", stringPages);
 
 app.route("/eta", etaPages);
+
+// step 6: pages from components
+app.get("/", (c) => {
+  const name = c.req.query("name") ?? "stranger";
+  return c.html(
+    <Layout title="Home">
+      <h1>Hello, {name}!</h1>
+      <p>The office side of the building survey.</p>
+    </Layout>,
+  );
+});
+
+app.get("/team", (c) =>
+  c.html(
+    <Layout title="Team">
+      <h1>Team</h1>
+      <ul>
+        {team.map((member) => (
+          <li>{member}</li>
+        ))}
+      </ul>
+    </Layout>,
+  ),
+);
 
 export default app; // Bun sees a default export with fetch() and serves it

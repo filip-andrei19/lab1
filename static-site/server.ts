@@ -55,7 +55,7 @@ const server = Bun.serve({
     // --- RUTA NOUĂ /status/:code ---
     if (url.pathname.startsWith("/status/")) {
       if (req.method === "GET") {
-        const code = parseInt(url.pathname.split("/")[2]);
+        const code = parseInt(url.pathname.split("/")[2] || "");
         if (isNaN(code) || code < 200 || code > 599) {
           return new Response("Bad Request", { status: 400 });
         }
