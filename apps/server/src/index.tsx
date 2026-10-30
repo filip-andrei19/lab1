@@ -8,6 +8,7 @@ import { etaPages } from "./eta-pages";
 import { stringPages } from "./string-pages";
 import { Layout } from "./views/Layout";
 import { entrancesApi } from "./entrances";
+import { cors } from "hono/cors";
 
 type Env = { Variables: { requestId: string } };
 const app = new Hono<Env>();
@@ -23,6 +24,15 @@ app.use(async (c, next) => {
   c.header("X-Request-Id", c.get("requestId"));
   c.header("X-Response-Time", `${ms}ms`);
 });
+
+app.use("/api/*", cors({ origin: "http://localhost:5173" }));
+
+// CORS by hand — let the page on localhost:5173 read /api answers
+app.use("/api/*", async (c, next) => {
+  await next();
+  c.header("Access-Control-Allow-Origin", "http://localhost:5173");
+});
+
 app.use("*", serveStatic({ root: "./public" }));
 
 app.get("/echo", (c) => c.json({ hello: c.req.query("name") ?? "stranger" }));
