@@ -1,12 +1,7 @@
 // apps/server/src/entrances.ts — the entrances API, in memory until week 4
 import { Hono } from "hono";
+import type { Entrance } from "@office/shared";
 
-type Entrance = {
-  id: number;
-  address: string;
-  floors: number;
-  hasElevator: boolean;
-};
 
 // lost on every restart: week 4 puts it in a database
 const entrances: Entrance[] = [
