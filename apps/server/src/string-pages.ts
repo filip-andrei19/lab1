@@ -1,9 +1,10 @@
 // src/string-pages.ts — pages built from strings, by hand
 import { Hono } from "hono";
+
 import { team } from "./data";
 
-export function layout(title: string, body: string): string {
-  return `<!doctype html>
+export const layout = (title: string, body: string): string =>
+  `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8">
@@ -14,7 +15,6 @@ export function layout(title: string, body: string): string {
     ${body}
   </body>
 </html>`;
-}
 
 export const stringPages = new Hono();
 

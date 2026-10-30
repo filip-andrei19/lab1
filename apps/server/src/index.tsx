@@ -1,16 +1,20 @@
+import { readdir } from "node:fs/promises";
+
 // src/index.tsx — the office site
 import { serveStatic } from "@hono/bun";
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 import { logger } from "hono/logger";
-import { readdir } from "node:fs/promises";
+
 import { team } from "./data";
+import { entrancesApi } from "./entrances";
 import { etaPages } from "./eta-pages";
 import { stringPages } from "./string-pages";
-import { Layout } from "./views/Layout";
-import { entrancesApi } from "./entrances";
-import { cors } from "hono/cors";
+import { Layout } from "./views/layout";
 
-type Env = { Variables: { requestId: string } };
+interface Env {
+  Variables: { requestId: string };
+}
 const app = new Hono<Env>();
 
 app.use(logger());
@@ -19,7 +23,10 @@ app.use(logger());
 app.use(async (c, next) => {
   const started = performance.now();
   c.set("requestId", crypto.randomUUID().slice(0, 8));
+
+  // eslint-disable-next-line node/callback-return
   await next();
+
   const ms = (performance.now() - started).toFixed(1);
   c.header("X-Request-Id", c.get("requestId"));
   c.header("X-Response-Time", `${ms}ms`);
@@ -27,18 +34,12 @@ app.use(async (c, next) => {
 
 app.use("/api/*", cors({ origin: "http://localhost:5173" }));
 
-// CORS by hand — let the page on localhost:5173 read /api answers
-app.use("/api/*", async (c, next) => {
-  await next();
-  c.header("Access-Control-Allow-Origin", "http://localhost:5173");
-});
-
 app.use("*", serveStatic({ root: "./public" }));
 
 app.get("/echo", (c) => c.json({ hello: c.req.query("name") ?? "stranger" }));
 app.post("/echo", async (c) => {
   const body = await c.req.text();
-  return c.json({ youSent: body, contentType: c.req.header("content-type") });
+  return c.json({ contentType: c.req.header("content-type"), youSent: body });
 });
 app.get("/time", (c) => {
   c.header("Cache-Control", "no-store");
@@ -47,9 +48,15 @@ app.get("/time", (c) => {
 
 // step 3: responses by hand
 app.get("/api/status", (c) =>
-  c.json({ ok: true, uptime: Math.round(process.uptime()), requestId: c.get("requestId") }),
+  c.json({
+    ok: true,
+    requestId: c.get("requestId"),
+    uptime: Math.round(process.uptime()),
+  })
 );
-app.get("/hello", (c) => c.html(`<h1>Hello, ${c.req.query("name") ?? "stranger"}!</h1>`));
+app.get("/hello", (c) =>
+  c.html(`<h1>Hello, ${c.req.query("name") ?? "stranger"}!</h1>`)
+);
 app.get("/teapot", (c) => {
   c.header("X-Brewed-By", "Hono");
   return c.text("I'm a teapot\n", 418);
@@ -69,7 +76,7 @@ app.get("/", (c) => {
     <Layout title="Home">
       <h1>Hello, {name}!</h1>
       <p>The office side of the building survey.</p>
-    </Layout>,
+    </Layout>
   );
 });
 
@@ -79,28 +86,31 @@ app.get("/team", (c) =>
       <h1>Team</h1>
       <ul>
         {team.map((member) => (
-          <li>{member}</li>
+          <li key={member}>{member}</li>
         ))}
       </ul>
-    </Layout>,
-  ),
+    </Layout>
+  )
 );
 
 // step 7b: a page that lists a folder
 app.get("/files", async (c) => {
   const names = await readdir("./public");
-  const files = names.map((name) => ({ name, size: Bun.file(`./public/${name}`).size }));
+  const files = names.map((name) => ({
+    name,
+    size: Bun.file(`./public/${name}`).size,
+  }));
   return c.html(
     <Layout title="Files">
       <h1>public/</h1>
       <ul>
         {files.map((file) => (
-          <li>
+          <li key={file.name}>
             <a href={`/${file.name}`}>{file.name}</a> — {file.size} bytes
           </li>
         ))}
       </ul>
-    </Layout>,
+    </Layout>
   );
 });
 
@@ -113,10 +123,11 @@ app.notFound((c) =>
         No page at <code>{c.req.path}</code>. <a href="/">Back home</a>
       </p>
     </Layout>,
-    404,
-  ),
+    404
+  )
 );
 
+// eslint-disable-next-line promise/prefer-await-to-callbacks
 app.onError((err, c) => {
   console.error(`[${c.get("requestId")}]`, err.message);
   return c.html(
@@ -124,7 +135,7 @@ app.onError((err, c) => {
       <h1>Something broke</h1>
       <p>Request {c.get("requestId")} failed. It has been logged.</p>
     </Layout>,
-    500,
+    500
   );
 });
 
