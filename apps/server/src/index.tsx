@@ -5,7 +5,7 @@ import { serveStatic } from "@hono/bun";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
-
+import { buildingsApi } from "./buildings";
 import { team } from "./data";
 import { entrancesApi } from "./entrances";
 import { etaPages } from "./eta-pages";
@@ -68,6 +68,8 @@ app.route("/strings", stringPages);
 
 // step 5: pages from an engine
 app.route("/eta", etaPages);
+
+app.route("/api/buildings", buildingsApi);
 
 // step 6: pages from components
 app.get("/", (c) => {
