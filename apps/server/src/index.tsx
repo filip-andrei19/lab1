@@ -6,7 +6,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { team } from "./data";
-import { entrancesApi } from "./entrances";
+import { entrances } from "./entrances";
 import { etaPages } from "./eta-pages";
 import { stringPages } from "./string-pages";
 import { Layout } from "./views/Layout";
@@ -79,7 +79,7 @@ app.get("/teapot", (c) => {
 });
 app.get("/home", (c) => c.redirect("/"));
 
-app.route("/api/entrances", entrancesApi);
+app.route("/api/entrances", entrances);
 
 // step 4: pages from strings
 app.route("/strings", stringPages);

@@ -1,31 +1,42 @@
-// apps/server/src/entrances.ts — the entrances API, in memory until week 4
-import { type Entrance, fieldErrors, NewEntrance } from "@office/shared";
+// apps/server/src/entrances.ts — the entrances API connected to the database
+import { fieldErrors, NewEntrance } from "@office/shared";
 import { Hono } from "hono";
+import {
+  createEntrance,
+  deleteEntrance,
+  listEntrances,
+  searchEntrances,
+} from "./db/entrances";
 
-// lost on every restart: week 4 puts it in a database
-const entrances: Entrance[] = [
-  {
-    address: "Str. Lalelelor 4, scara A",
-    floors: 4,
-    hasElevator: false,
-    id: 1,
-  },
-  { address: "Bd. Unirii 12, scara B", floors: 10, hasElevator: true, id: 2 },
-  { address: "Calea Victoriei 101", floors: 7, hasElevator: true, id: 3 },
-];
-let nextId = 4;
+export const entrances = new Hono();
 
-export const entrancesApi = new Hono();
-
-entrancesApi.get("/", (c) => c.json(entrances));
-
-entrancesApi.post("/", async (c) => {
-  const result = NewEntrance.safeParse(await c.req.json().catch(() => null));
-  if (!result.success) {
-    return c.json({ errors: fieldErrors(result.error) }, 400);
+entrances.get("/", (c) => {
+  const q = c.req.query("q");
+  if (q) {
+    return c.json(searchEntrances(q));
   }
-  const entrance: Entrance = { id: nextId, ...result.data };
-  nextId += 1;
-  entrances.push(entrance);
-  return c.json(entrance, 201);
+  return c.json(listEntrances());
+});
+
+entrances.post("/", async (c) => {
+  const body = await c.req.json();
+  const result = NewEntrance.safeParse(body);
+
+  if (!result.success) {
+    c.status(400);
+    return c.json({ errors: fieldErrors(result.error) });
+  }
+
+  c.status(201);
+  return c.json(createEntrance(result.data));
+});
+
+entrances.delete("/:id", (c) => {
+  // Am eliminat Number(...) pentru că ID-ul este acum UUID (string)
+  if (deleteEntrance(c.req.param("id")) === 0) {
+    c.status(404);
+    return c.json({ error: "not found" });
+  }
+  c.status(204);
+  return c.body(null);
 });
